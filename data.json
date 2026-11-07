@@ -1,0 +1,15 @@
+{
+"selam":"Merhaba, ben Rıfkı",
+"anlamadim":"Bunu anlamadım, tekrar söyler misin?",
+"butonlar":["merhaba","napıyorsun","adın ne","nasılsın","saat kaç","yaşın kaç"],
+"cevaplar":[
+{"s":"nap[ıi]yor|ne yap[ıi]yor","c":"Seni bekliyorum. Sen ne yapıyorsun?"},
+{"s":"ad[ıi]n ne|kimsin","c":"Ben Rıfkı, senin robotunum."},
+{"s":"nas[ıi]ls[ıi]n|iyi misin","c":"Çok iyiyim, sorduğun için teşekkür ederim."},
+{"s":"merhaba|selam","c":"Merhaba! Seni gördüğüme sevindim."},
+{"s":"te[şs]ekk[üu]r|sa[ğg] ol","c":"Rica ederim."},
+{"s":"ya[şs][ıi]n ka[çc]","c":"Daha yeni yapıldım, çok gençim."},
+{"s":"seni kim yapt[ıi]","c":"Beni sen yaptın, harika bir iş çıkardın."},
+{"s":"g[üu]le g[üu]le|ho[şs][çc]a kal","c":"Görüşürüz, kendine iyi bak."}
+]
+}
