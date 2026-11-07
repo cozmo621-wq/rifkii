@@ -6,12 +6,14 @@
 <style>
 body{margin:0;background:#000;color:#fff;font-family:sans-serif}
 video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;display:none}
-#i{position:fixed;inset:0;background:#111;z-index:5;text-align:center;padding:20% 16px 0}
-button,label{font-size:20px;padding:14px 26px;border-radius:14px;border:0;background:#0a84ff;color:#fff;display:inline-block;margin:8px}
+#i{position:fixed;inset:0;background:#111;z-index:5;text-align:center;padding:8% 16px 0;overflow:auto}
+button,label{font-size:18px;padding:12px 22px;border-radius:14px;border:0;background:#0a84ff;color:#fff;display:inline-block;margin:6px}
 button:disabled{background:#444}
+select{width:90%;font-size:16px;margin:6px;padding:8px}
+input[type=range]{width:70%}
 #d{position:fixed;left:8px;bottom:6px;opacity:.5;z-index:9}
 #k{position:fixed;left:0;right:0;top:6px;text-align:center;z-index:9;opacity:.3;display:none}
-#k button{font-size:15px;padding:8px 12px;margin:3px}
+#k button{font-size:14px;padding:7px 11px;margin:3px}
 </style></head><body>
 <video id="v" loop muted playsinline></video>
 <div id="i">
@@ -19,13 +21,37 @@ button:disabled{background:#444}
 <p id="st">WiFi bekleniyor...</p>
 <label>Video seç<input id="f" type="file" accept="video/*" hidden></label><br>
 <button id="b" disabled>Başlat</button>
+<hr>
+<p>Ses ayarı</p>
+<select id="sl"></select><br>
+<button onclick="pre(1,1)">Normal</button><button onclick="pre(0.6,0.85)">Robot</button><button onclick="pre(1.7,1.1)">Tiz</button><button onclick="pre(0.8,0.7)">Yavaş</button><br>
+Ton <input id="pt" type="range" min="0.4" max="2" step="0.1"><br>
+Hız <input id="hz" type="range" min="0.5" max="1.6" step="0.1"><br>
+<button onclick="dene()">Sesi dinle</button>
 </div>
 <div id="d"></div>
 <div id="k"></div>
 <script>
-var v=document.getElementById('v'),d=document.getElementById('d'),st=document.getElementById('st'),bt=document.getElementById('b'),k=document.getElementById('k'),db,D=null,kon=0,basladi=0;
+var v=document.getElementById('v'),d=document.getElementById('d'),st=document.getElementById('st'),bt=document.getElementById('b'),k=document.getElementById('k'),sl=document.getElementById('sl'),pt=document.getElementById('pt'),hz=document.getElementById('hz'),db,D=null,kon=0,basladi=0,mod='n',soru='',pen=0,mt=0,L=[],A={ses:'',pit:1,hiz:1},vs=[];
 try{D=JSON.parse(localStorage.getItem('rifki'))}catch(e){}
+try{L=JSON.parse(localStorage.getItem('rifki_ogr'))||[]}catch(e){}
+try{A=JSON.parse(localStorage.getItem('rifki_ses'))||A}catch(e){}
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js')}
+pt.value=A.pit;hz.value=A.hiz;
+
+function ky(){try{localStorage.setItem('rifki_ses',JSON.stringify(A))}catch(e){}}
+function og(){try{localStorage.setItem('rifki_ogr',JSON.stringify(L))}catch(e){}}
+function sesler(){try{vs=speechSynthesis.getVoices()}catch(e){return}
+var t=vs.filter(function(x){return /^tr/i.test(x.lang)});if(!t.length)t=vs;
+sl.innerHTML='';t.forEach(function(x){var o=document.createElement('option');o.value=x.name;o.textContent=x.name;if(x.name==A.ses)o.selected=true;sl.appendChild(o)});
+if(!A.ses&&t[0])A.ses=t[0].name}
+try{speechSynthesis.onvoiceschanged=sesler}catch(e){}
+sesler();
+sl.onchange=function(){A.ses=sl.value;ky();dene()};
+pt.oninput=function(){A.pit=+pt.value;ky()};
+hz.oninput=function(){A.hiz=+hz.value;ky()};
+function pre(p,h){A.pit=p;A.hiz=h;pt.value=p;hz.value=h;ky();dene()}
+function dene(){say('Merhaba, ben Rıfkı. Bu sesim nasıl?')}
 
 function hazir(){bt.disabled=false;k.innerHTML='';(D.butonlar||[]).forEach(function(x){var e=document.createElement('button');e.textContent=x;e.onclick=function(){cevap(x)};k.appendChild(e)})}
 function guncelle(){
@@ -45,20 +71,47 @@ q.onsuccess=function(){db=q.result;try{var g=db.transaction('s').objectStore('s'
 function sh(b){v.src=URL.createObjectURL(b);v.style.display='block';try{v.play()}catch(e){}}
 document.getElementById('f').onchange=function(e){var b=e.target.files[0];if(b){try{db.transaction('s','readwrite').objectStore('s').put(b,'v')}catch(x){}sh(b)}};
 
-function say(m){try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(m);u.lang='tr-TR';kon=1;var b=function(){setTimeout(function(){kon=0},600)};u.onend=b;u.onerror=b;speechSynthesis.speak(u);setTimeout(function(){kon=0},5000)}catch(e){kon=0}}
-function cevap(s){
-if(/saat ka[çc]/.test(s)){say('Saat '+new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}));return}
-for(var i=0;i<D.cevaplar.length;i++){if(new RegExp(D.cevaplar[i].s).test(s)){say(D.cevaplar[i].c);return}}
-say(D.anlamadim)}
+function say(m){try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(m);u.lang='tr-TR';u.pitch=A.pit;u.rate=A.hiz;
+for(var i=0;i<vs.length;i++){if(vs[i].name==A.ses){u.voice=vs[i];break}}
+kon=1;var b=function(){setTimeout(function(){kon=0},600)};u.onend=b;u.onerror=b;speechSynthesis.speak(u);
+setTimeout(function(){kon=0},m.length*110+3000)}catch(e){kon=0}}
+
+function nor(s){return s.toLocaleLowerCase('tr').replace(/r[ıi]f[kg][ıi]?/g,' ').replace(/[^a-zçğıöşü0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
+function benz(a,b){if(!a||!b)return 0;var x=a.split(' '),y=b.split(' '),o=0;x.forEach(function(w){if(y.indexOf(w)>=0)o++});return o/Math.max(x.length,y.length)}
+function sec(c){return Array.isArray(c)?c[Math.floor(Math.random()*c.length)]:c}
+function md(x){mod=x;clearTimeout(mt);if(x!='n')mt=setTimeout(function(){mod='n'},40000)}
+
+function cevap(ham){
+var n=nor(ham);
+if(mod!='n'&&/vazge[çc]|iptal/.test(n)){md('n');say('Tamam, vazgeçtim.');return}
+if(mod=='o'){
+if(/evet|isterim|istiyorum|ekle|olur/.test(n)){md('c');say('Dinliyorum, cevabı söyle.')}
+else if(/hay[ıi]r|yok|istemiyorum|gerek/.test(n)){md('n');say('Tamam.')}
+else say('Evet ya da hayır de. Eklememi ister misin?');
+return}
+if(mod=='s'){if(!n)return;soru=n;md('c');say('Evet, şimdi bu soru sorulunca vereceğim cevabı söyle.');return}
+if(mod=='c'){if(!n)return;L.push({s:soru,c:ham.replace(/r[ıi]f[kg][ıi]?/gi,'').trim()});og();md('n');say('Tamam, öğrendim.');return}
+if(/[öo]zellik ekle|[öo][gğ]ret/.test(n)){md('s');say('Evet, soruyu söyle.');return}
+if(/unut/.test(n)){L.pop();og();say('Tamam, son öğrendiğimi unuttum.');return}
+if(/saat ka[çc]/.test(n)){say('Saat '+new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}));return}
+var en=0,ec=null;L.forEach(function(x){var b=benz(n,x.s);if(b>en){en=b;ec=x}});
+if(ec&&en>=0.75){say(ec.c);return}
+for(var i=0;i<D.cevaplar.length;i++){if(new RegExp(D.cevaplar[i].s).test(n)){say(sec(D.cevaplar[i].c));return}}
+soru=n;md('o');say(D.bilmiyorum||'Bunu bilmiyorum, istersen ekleyebilirim. Eklememi ister misin?')}
+
 function t(){
 var S=window.SpeechRecognition||window.webkitSpeechRecognition;
 if(!S){d.textContent='Ses tanıma yok';return}
 var r=new S();r.lang='tr-TR';r.continuous=true;
-r.onresult=function(e){var s=e.results[e.results.length-1][0].transcript.toLowerCase();d.textContent='"'+s+'"';
-if(kon||!/r[ıi]f[kg]/.test(s))return;cevap(s)};
+r.onresult=function(e){var s=e.results[e.results.length-1][0].transcript;d.textContent='"'+s+'"';
+if(kon)return;
+var w=/r[ıi]f[kg]/i.test(s);
+if(mod=='n'){if(!w&&Date.now()>pen)return;if(!nor(s)){say('Efendim?');pen=Date.now()+8000;return}}
+cevap(s)};
 r.onerror=function(e){if(e.error!='no-speech'&&e.error!='aborted')d.textContent='Mik: '+e.error};
 r.onend=function(){setTimeout(t,400)};
 try{r.start()}catch(e){setTimeout(t,1000)}}
+
 bt.onclick=function(){
 document.getElementById('i').style.display='none';k.style.display='block';
 try{document.documentElement.requestFullscreen().then(function(){screen.orientation.lock('landscape')}).catch(function(){})}catch(e){}
