@@ -1,0 +1,68 @@
+<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rıfkı</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+<style>
+body{margin:0;background:#000;color:#fff;font-family:sans-serif}
+video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+#i{position:fixed;inset:0;background:#111;z-index:5;text-align:center;padding:20% 16px 0}
+button,label{font-size:20px;padding:14px 26px;border-radius:14px;border:0;background:#0a84ff;color:#fff;display:inline-block;margin:8px}
+button:disabled{background:#444}
+#d{position:fixed;left:8px;bottom:6px;opacity:.5;z-index:9}
+#k{position:fixed;left:0;right:0;top:6px;text-align:center;z-index:9;opacity:.3;display:none}
+#k button{font-size:15px;padding:8px 12px;margin:3px}
+</style></head><body>
+<video id="v" loop muted playsinline></video>
+<div id="i">
+<h2>Rıfkı</h2>
+<p id="st">WiFi bekleniyor...</p>
+<label>Video seç<input id="f" type="file" accept="video/*" hidden></label><br>
+<button id="b" disabled>Başlat</button>
+</div>
+<div id="d"></div>
+<div id="k"></div>
+<script>
+var v=document.getElementById('v'),d=document.getElementById('d'),st=document.getElementById('st'),bt=document.getElementById('b'),k=document.getElementById('k'),db,D=null,kon=0,basladi=0;
+try{D=JSON.parse(localStorage.getItem('rifki'))}catch(e){}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js')}
+
+function hazir(){bt.disabled=false;k.innerHTML='';(D.butonlar||[]).forEach(function(x){var e=document.createElement('button');e.textContent=x;e.onclick=function(){cevap(x)};k.appendChild(e)})}
+function guncelle(){
+var ac=new AbortController();setTimeout(function(){ac.abort()},6000);
+fetch('data.json',{cache:'no-store',signal:ac.signal}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){
+D=j;try{localStorage.setItem('rifki',JSON.stringify(j))}catch(e){}
+st.textContent='Tamamlandı! Veriler indirildi. Şimdi RIFKI.İRA ağına bağlanın, sonra Başlat tuşuna basın.';hazir()
+}).catch(function(){
+if(D){st.textContent='İnternet yok, kayıtlı veriler kullanılıyor. Başlat tuşuna basabilirsiniz.';hazir()}
+else{st.textContent='WiFi bekleniyor... İnternete bağlanın.';setTimeout(guncelle,4000)}
+})}
+guncelle();
+
+var q=indexedDB.open('k',1);
+q.onupgradeneeded=function(){q.result.createObjectStore('s')};
+q.onsuccess=function(){db=q.result;try{var g=db.transaction('s').objectStore('s').get('v');g.onsuccess=function(){if(g.result)sh(g.result)}}catch(e){}};
+function sh(b){v.src=URL.createObjectURL(b);v.style.display='block';try{v.play()}catch(e){}}
+document.getElementById('f').onchange=function(e){var b=e.target.files[0];if(b){try{db.transaction('s','readwrite').objectStore('s').put(b,'v')}catch(x){}sh(b)}};
+
+function say(m){try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(m);u.lang='tr-TR';kon=1;var b=function(){setTimeout(function(){kon=0},600)};u.onend=b;u.onerror=b;speechSynthesis.speak(u);setTimeout(function(){kon=0},5000)}catch(e){kon=0}}
+function cevap(s){
+if(/saat ka[çc]/.test(s)){say('Saat '+new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}));return}
+for(var i=0;i<D.cevaplar.length;i++){if(new RegExp(D.cevaplar[i].s).test(s)){say(D.cevaplar[i].c);return}}
+say(D.anlamadim)}
+function t(){
+var S=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!S){d.textContent='Ses tanıma yok';return}
+var r=new S();r.lang='tr-TR';r.continuous=true;
+r.onresult=function(e){var s=e.results[e.results.length-1][0].transcript.toLowerCase();d.textContent='"'+s+'"';
+if(kon||!/r[ıi]f[kg]/.test(s))return;cevap(s)};
+r.onerror=function(e){if(e.error!='no-speech'&&e.error!='aborted')d.textContent='Mik: '+e.error};
+r.onend=function(){setTimeout(t,400)};
+try{r.start()}catch(e){setTimeout(t,1000)}}
+bt.onclick=function(){
+document.getElementById('i').style.display='none';k.style.display='block';
+try{document.documentElement.requestFullscreen().then(function(){screen.orientation.lock('landscape')}).catch(function(){})}catch(e){}
+try{navigator.wakeLock.request('screen')}catch(e){}
+try{v.play()}catch(e){}
+say(D.selam);if(!basladi){basladi=1;t()}};
+</script></body></html>
