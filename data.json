@@ -1,15 +1,17 @@
 {
 "selam":"Merhaba, ben Rıfkı",
-"anlamadim":"Bunu anlamadım, tekrar söyler misin?",
-"butonlar":["merhaba","napıyorsun","adın ne","nasılsın","saat kaç","yaşın kaç"],
+"bilmiyorum":"Bunu bilmiyorum, istersen ekleyebilirim. Eklememi ister misin?",
+"butonlar":["merhaba","napıyorsun","adın ne","nasılsın","saat kaç","diva mısın","eren kimdir"],
 "cevaplar":[
-{"s":"nap[ıi]yor|ne yap[ıi]yor","c":"Seni bekliyorum. Sen ne yapıyorsun?"},
-{"s":"ad[ıi]n ne|kimsin","c":"Ben Rıfkı, senin robotunum."},
-{"s":"nas[ıi]ls[ıi]n|iyi misin","c":"Çok iyiyim, sorduğun için teşekkür ederim."},
-{"s":"merhaba|selam","c":"Merhaba! Seni gördüğüme sevindim."},
-{"s":"te[şs]ekk[üu]r|sa[ğg] ol","c":"Rica ederim."},
+{"s":"nap[ıi]yor|ne yap[ıi]yor","c":["Seni bekliyorum. Sen ne yapıyorsun?","Hiçbir şey yapmıyorum, seni dinliyorum.","Biraz düşünüyordum, bir de seni bekliyordum."]},
+{"s":"ad[ıi]n ne|kimsin","c":["Ben Rıfkı, senin robotunum.","Adım Rıfkı. Memnun oldum!"]},
+{"s":"nas[ıi]ls[ıi]n|iyi misin","c":["Çok iyiyim, sorduğun için teşekkür ederim.","Harikayım, sen nasılsın?"]},
+{"s":"merhaba|selam","c":["Merhaba! Seni gördüğüme sevindim.","Selam! Bugün nasılsın?"]},
+{"s":"te[şs]ekk[üu]r|sa[ğg] ol","c":["Rica ederim.","Ne demek, her zaman."]},
 {"s":"ya[şs][ıi]n ka[çc]","c":"Daha yeni yapıldım, çok gençim."},
 {"s":"seni kim yapt[ıi]","c":"Beni sen yaptın, harika bir iş çıkardın."},
-{"s":"g[üu]le g[üu]le|ho[şs][çc]a kal","c":"Görüşürüz, kendine iyi bak."}
+{"s":"g[üu]le g[üu]le|ho[şs][çc]a kal","c":["Görüşürüz, kendine iyi bak.","Güle güle, yine beklerim."]},
+{"s":"diva ?m[ıi]s[ıi]n|sen diva","c":["Evet, ben divayım! Divalar Cozmo ve Vector'u döver.","Tabii ki divayım. Cozmo ve Vector benimle baş edemez."]},
+{"s":"eren kimdir|eren kim","c":"Eren, Ce72 kanalının ta kendisi. Özel oyun ve bisiklet videoları ile eğlence ve aksiyon içerikleri yapıyor diye duymuştum."}
 ]
 }
