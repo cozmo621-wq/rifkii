@@ -1,0 +1,657 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rıfkı</title>
+<meta name="theme-color" content="#000000">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#000;color:white;font-family:Arial,sans-serif}
+button,select,input,label{font-size:16px;border:0;border-radius:12px;padding:12px;margin:5px}
+button,label{background:#087fff;color:white}
+button:disabled{background:#555}
+video#v{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;display:none;background:#000}
+#i{position:fixed;inset:0;background:#111;z-index:5;text-align:center;padding:25px 12px;overflow:auto}
+#i select{width:90%;background:#fff;color:#111}
+#i input[type=range]{width:75%}
+#mic{position:fixed;right:12px;top:12px;z-index:30;border-radius:30px}
+#mic.off{background:#555}
+#cw{position:fixed;right:10px;top:65px;width:30vmin;height:30vmin;z-index:20;border:2px solid #087fff;border-radius:12px;overflow:hidden;display:none}
+#cv{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#cs{position:absolute;bottom:0;background:#0009;width:100%;font-size:12px}
+#d{position:fixed;bottom:5px;left:8px;z-index:25;font-size:12px;opacity:.7}
+#atla{position:fixed;top:10px;left:10px;z-index:25;display:none}
+#status{color:#8bd5ff}
+</style>
+</head>
+<body>
+
+<video id="v" loop muted playsinline></video>
+
+<button id="mic" onclick="mikrofonDegistir()">🎙️ Mikrofon Açık</button>
+
+<div id="cw">
+<video id="cv" autoplay muted playsinline></video>
+<div id="cs">Kamera</div>
+</div>
+
+<button id="atla" onclick="kalAtla()">Kalibrasyonu Atla</button>
+
+<div id="i">
+<h1>🤖 Rıfkı</h1>
+<p id="status">Rıfkı hazırlanıyor...</p>
+
+<label>
+Video seç
+<input id="f" type="file" accept="video/*" hidden>
+</label>
+
+<br>
+<button id="b">Başlat</button>
+
+<hr>
+
+<h3>🌍 Dil ayarları</h3>
+
+<select id="lang">
+<option value="tr-TR">Türkçe</option>
+<option value="en-US">English</option>
+<option value="de-DE">Deutsch</option>
+<option value="fr-FR">Français</option>
+<option value="ar-SA">العربية</option>
+</select>
+
+<h3>🗣️ Ses seçimi</h3>
+<select id="sl"></select>
+
+<h3>Ses ayarları</h3>
+<button onclick="pre(1,1)">Normal</button>
+<button onclick="pre(.7,.85)">Robot</button>
+<button onclick="pre(1.5,1.1)">Tiz</button>
+<button onclick="pre(.8,.7)">Yavaş</button>
+
+<p>Ton</p>
+<input id="pt" type="range" min=".4" max="2" step=".1">
+
+<p>Hız</p>
+<input id="hz" type="range" min=".5" max="1.6" step=".1">
+
+<br>
+<button onclick="dene()">Sesi dinle</button>
+
+<hr>
+
+<h3>📷 Kamera</h3>
+<button onclick="kamAc()">Kamerayı Aç</button>
+<button onclick="kamKapat()">Kamerayı Kapat</button>
+<button onclick="kalBasla()">Kalibrasyon</button>
+
+<hr>
+<p>Rıfkı'nın mikrofonu açık veya kapalı olabilir.</p>
+<p>Açık = Dinler | Kapalı = Dinlemez</p>
+</div>
+
+<div id="d"></div>
+
+<script>
+/* AYARLAR */
+
+var $=id=>document.getElementById(id);
+
+var v=$('v'),bt=$('b'),st=$('status');
+var mic=$('mic'),d=$('d'),sl=$('sl');
+var lang=$('lang'),pt=$('pt'),hz=$('hz');
+var cv=$('cv'),cw=$('cw'),cs=$('cs');
+
+var micOn=true;
+var started=false;
+var recognition=null;
+var camera=null;
+var voices=[];
+var speaking=false;
+var sid=0;
+var calibration=false;
+var calTimer=null;
+
+var A={
+lang:'tr-TR',
+voice:'',
+pitch:1,
+rate:1
+};
+
+try{
+var saved=JSON.parse(localStorage.getItem('rifki_settings'));
+if(saved)A=Object.assign(A,saved);
+}catch(e){}
+
+lang.value=A.lang;
+pt.value=A.pitch;
+hz.value=A.rate;
+
+function saveSettings(){
+try{
+localStorage.setItem('rifki_settings',JSON.stringify(A));
+}catch(e){}
+}
+
+lang.onchange=function(){
+A.lang=lang.value;
+A.voice='';
+saveSettings();
+sesleriYukle();
+dinlemeYenile();
+};
+
+pt.oninput=function(){
+A.pitch=+pt.value;
+saveSettings();
+};
+
+hz.oninput=function(){
+A.rate=+hz.value;
+saveSettings();
+};
+
+function pre(p,h){
+A.pitch=p;
+A.rate=h;
+pt.value=p;
+hz.value=h;
+saveSettings();
+dene();
+}
+
+/* SES LİSTESİ */
+
+function sesleriYukle(){
+if(!window.speechSynthesis)return;
+
+voices=speechSynthesis.getVoices();
+
+var uygun=voices.filter(function(x){
+return x.lang.toLowerCase().startsWith(A.lang.substring(0,2).toLowerCase());
+});
+
+if(!uygun.length)uygun=voices;
+
+sl.innerHTML='';
+
+if(!uygun.length){
+var op=document.createElement('option');
+op.textContent='Cihazda ses bulunamadı';
+sl.appendChild(op);
+return;
+}
+
+uygun.forEach(function(x){
+var o=document.createElement('option');
+o.value=x.name;
+o.textContent=x.name+' ('+x.lang+')';
+if(x.name===A.voice)o.selected=true;
+sl.appendChild(o);
+});
+
+if(!A.voice||!uygun.some(x=>x.name===A.voice)){
+A.voice=uygun[0].name;
+}
+
+sl.value=A.voice;
+saveSettings();
+}
+
+if(window.speechSynthesis){
+speechSynthesis.onvoiceschanged=sesleriYukle;
+sesleriYukle();
+setTimeout(sesleriYukle,1000);
+setTimeout(sesleriYukle,3000);
+}
+
+sl.onchange=function(){
+A.voice=sl.value;
+saveSettings();
+dene();
+};
+
+/* KONUŞMA */
+
+function say(m,cb){
+if(!window.speechSynthesis){
+if(cb)cb();
+return;
+}
+
+var my=++sid;
+speaking=true;
+
+if(recognition){
+try{recognition.abort()}catch(e){}
+}
+
+speechSynthesis.cancel();
+
+var u=new SpeechSynthesisUtterance(m);
+u.lang=A.lang;
+u.pitch=A.pitch;
+u.rate=A.rate;
+
+var voice=voices.find(x=>x.name===A.voice);
+if(voice)u.voice=voice;
+
+var done=false;
+
+function finish(){
+if(done||my!==sid)return;
+done=true;
+speaking=false;
+setTimeout(function(){
+if(my===sid&&micOn&&started)dinlemeBaslat();
+if(cb)cb();
+},350);
+}
+
+u.onend=finish;
+u.onerror=finish;
+
+speechSynthesis.speak(u);
+
+setTimeout(finish,Math.max(5000,m.length*150));
+}
+
+function dene(){
+var samples={
+'tr-TR':'Merhaba, ben Rıfkı.',
+'en-US':'Hello, I am Rifki.',
+'de-DE':'Hallo, ich bin Rifki.',
+'fr-FR':'Bonjour, je suis Rifki.',
+'ar-SA':'مرحبا، أنا رفقى.'
+};
+say(samples[A.lang]||samples['tr-TR']);
+}
+
+/* MİKROFON */
+
+function mikrofonGor(){
+mic.textContent=micOn?'🎙️ Mikrofon Açık':'🔇 Mikrofon Kapalı';
+mic.className=micOn?'':'off';
+}
+
+function mikrofonDegistir(){
+micOn=!micOn;
+mikrofonGor();
+
+if(!micOn){
+if(recognition){
+try{recognition.abort()}catch(e){}
+recognition=null;
+}
+d.textContent='Mikrofon kapalı';
+}else{
+d.textContent='Mikrofon açık';
+dinlemeBaslat();
+}
+}
+
+mikrofonGor();
+
+function dinlemeYenile(){
+if(recognition){
+try{recognition.abort()}catch(e){}
+recognition=null;
+}
+if(micOn&&started)setTimeout(dinlemeBaslat,500);
+}
+
+function dinlemeBaslat(){
+if(!micOn||!started||speaking||recognition)return;
+
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+
+if(!SR){
+d.textContent='Bu tarayıcı ses tanımayı desteklemiyor.';
+return;
+}
+
+var r=new SR();
+recognition=r;
+
+r.lang=A.lang;
+r.continuous=true;
+r.interimResults=false;
+r.maxAlternatives=3;
+
+r.onresult=function(e){
+if(!micOn||speaking)return;
+
+var result=e.results[e.results.length-1];
+var text=result[0].transcript.trim();
+
+d.textContent='Duyulan: '+text;
+
+if(text)cevap(text);
+};
+
+r.onerror=function(e){
+if(e.error!=='no-speech'&&e.error!=='aborted'){
+d.textContent='Mikrofon: '+e.error;
+}
+};
+
+r.onend=function(){
+if(recognition===r)recognition=null;
+if(micOn&&started&&!speaking){
+setTimeout(dinlemeBaslat,500);
+}
+};
+
+try{
+r.start();
+}catch(e){
+recognition=null;
+setTimeout(dinlemeBaslat,1000);
+}
+}
+
+/* VERİLER - İNTERNET GEREKTİRMEZ */
+
+var D={
+selam:'Merhaba! Ben Rıfkı. Nasılsın?',
+bilmiyorum:'Bunu henüz bilmiyorum. İstersen bana öğretebilirsin.',
+cevaplar:[
+{s:'merhaba|selam',c:['Merhaba!','Selam! Nasılsın?','Buradayım!']},
+{s:'nasılsın|nasilsin',c:['Çok iyiyim!','Harikayım! Sen nasılsın?']},
+{s:'kimsin|adın ne',c:['Ben Rıfkı! Senin robot arkadaşınım.']},
+{s:'ne yapıyorsun',c:['Seninle konuşuyorum!']},
+{s:'teşekkür|sağ ol',c:['Rica ederim!','Her zaman!']},
+{s:'günaydın',c:['Günaydın! Güzel bir gün olsun!']},
+{s:'iyi geceler',c:['İyi geceler!']},
+{s:'kaç yaşındasın',c:['Ben bir robotum, yaşım yok!']},
+{s:'fenerbahçe',c:['Fenerbahçe! Sarı lacivert!']},
+{s:'galatasaray',c:['Futbol sohbeti mi yapıyoruz?']}
+]
+};
+
+/* DATA.JSON VARSA ARKA PLANDA YÜKLE */
+
+fetch('data.json')
+.then(r=>r.ok?r.json():null)
+.then(j=>{
+if(j&&Array.isArray(j.cevaplar)){
+D=j;
+st.textContent='Rıfkı hazır!';
+}
+})
+.catch(()=>{});
+
+/* HAFIZA */
+
+var L=[];
+var kisi='';
+
+try{
+L=JSON.parse(localStorage.getItem('rifki_ogr'))||[];
+kisi=localStorage.getItem('rifki_kisi')||'';
+}catch(e){}
+
+function hafizaKaydet(){
+localStorage.setItem('rifki_ogr',JSON.stringify(L));
+}
+
+function normal(s){
+return s.toLocaleLowerCase('tr-TR')
+.replace(/[.,!?;:]/g,'')
+.trim();
+}
+
+function hesapla(s){
+var m=s.match(/(\d+)\s*(artı|eksi|çarpı|çarp|bölü|böl|kere)\s*(\d+)/i);
+if(!m)return null;
+
+var a=Number(m[1]),b=Number(m[3]);
+var op=m[2].toLowerCase();
+
+if(op==='artı')return a+b;
+if(op==='eksi')return a-b;
+if(op==='bölü'||op==='böl'){
+if(b===0)return 'Sıfıra bölemem.';
+return Math.round(a/b*100)/100;
+}
+return a*b;
+}
+
+var saka=[
+'Matematik kitabı neden üzgün? Çünkü çok problemi var!',
+'Robot neden yorulmaz? Çünkü enerjisi bitene kadar çalışır!',
+'Bilgisayar neden doktora gitmiş? Virüs kapmış!',
+'Ağaç neden internete kolay girer? Çünkü kökten bağlantısı var!'
+];
+
+var ogretme=null;
+
+/* SOHBET */
+
+function cevap(raw){
+var s=normal(raw);
+var c=null;
+
+if(!s)return;
+
+if(ogretme==='soru'){
+ogretme={s:raw};
+say('Tamam, bu sorunun cevabını söyle.');
+return;
+}
+
+if(typeof ogretme==='object'&&ogretme!==null){
+L.push({s:ogretme.s,c:raw});
+hafizaKaydet();
+ogretme=null;
+say('Tamam! Bunu öğrendim ve hafızama kaydettim.');
+return;
+}
+
+if(/beni unut|adımı unut/.test(s)){
+kisi='';
+localStorage.removeItem('rifki_kisi');
+say('Tamam, ismini unuttum.');
+return;
+}
+
+if(/adım ne|ismim ne/.test(s)){
+say(kisi?'Senin adın '+kisi+'.':'Henüz adını bilmiyorum.');
+return;
+}
+
+var isim=s.match(/(?:adım|ismim) ([a-zçğıöşü]+)/i);
+
+if(isim){
+kisi=isim[1];
+localStorage.setItem('rifki_kisi',kisi);
+say('Memnun oldum '+kisi+'!');
+return;
+}
+
+if(/öğret|soru ekle|cevap ekle/.test(s)){
+ogretme='soru';
+say('Bana öğretmek istediğin soruyu söyle.');
+return;
+}
+
+if(/unut/.test(s)){
+if(L.length)L.pop();
+hafizaKaydet();
+say('Son öğrendiğim bilgiyi sildim.');
+return;
+}
+
+if(/kamera/.test(s)){
+if(/kapat/.test(s)){
+kamKapat();
+say('Kamerayı kapattım.');
+}else{
+kamAc();
+say('Kamerayı açtım.');
+}
+return;
+}
+
+if(/beni görüyor musun/.test(s)){
+if(camera&&cv.readyState>=2){
+say('Kameram açık. Görüntü alıyorum.');
+}else{
+say('Şu anda kameram kapalı.');
+}
+return;
+}
+
+if(/şaka|fıkra|güldür/.test(s)){
+say(saka[Math.floor(Math.random()*saka.length)]);
+return;
+}
+
+if(/saat kaç/.test(s)){
+say('Saat '+new Date().toLocaleTimeString(A.lang,{hour:'2-digit',minute:'2-digit'}));
+return;
+}
+
+if(/bugün hangi gün|bugünün tarihi|tarih ne/.test(s)){
+say(new Date().toLocaleDateString(A.lang,{
+weekday:'long',day:'numeric',month:'long',year:'numeric'
+}));
+return;
+}
+
+if(/ne yapabilirsin|yardım/.test(s)){
+say('Benimle konuşabilirsin, bana soru öğretebilirsin, hesap yaptırabilirsin, şaka isteyebilirsin ve kameramı kullanabilirsin.');
+return;
+}
+
+var result=hesapla(s);
+if(result!==null){
+say('Sonuç '+result);
+return;
+}
+
+var learned=L.find(x=>normal(x.s)===s);
+if(learned){
+say(learned.c);
+return;
+}
+
+for(var i=0;i<D.cevaplar.length;i++){
+try{
+if(new RegExp(D.cevaplar[i].s,'i').test(s)){
+c=D.cevaplar[i].c;
+if(Array.isArray(c))c=c[Math.floor(Math.random()*c.length)];
+say(c);
+return;
+}
+}catch(e){}
+}
+
+say(D.bilmiyorum+' Bana öğretmek ister misin?');
+}
+
+/* KAMERA */
+
+function kamAc(){
+if(camera)return Promise.resolve();
+
+if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+say('Bu tarayıcı kamerayı desteklemiyor.');
+return Promise.reject();
+}
+
+return navigator.mediaDevices.getUserMedia({
+video:{facingMode:'user'},
+audio:false
+}).then(function(stream){
+camera=stream;
+cv.srcObject=stream;
+cw.style.display='block';
+return cv.play().catch(()=>{});
+}).catch(function(){
+say('Kamera izni verilmedi.');
+throw new Error('Kamera açılamadı');
+});
+}
+
+function kamKapat(){
+if(camera){
+camera.getTracks().forEach(t=>t.stop());
+camera=null;
+}
+cv.srcObject=null;
+cw.style.display='none';
+cs.textContent='Kamera kapalı';
+}
+
+/* KALİBRASYON */
+
+function kalBasla(){
+calibration=true;
+$('atla').style.display='block';
+
+say('Kalibrasyona başlıyoruz. Önce kamerayı açacağım.',function(){
+kamAc().then(function(){
+if(!calibration)return;
+say('Kamera açıldı. Şimdi mikrofon testi yapalım. Bana merhaba de.');
+}).catch(function(){
+if(calibration)say('Kamera açılamadı. Kalibrasyonu atlayabilirsin.');
+});
+});
+}
+
+function kalAtla(){
+calibration=false;
+$('atla').style.display='none';
+say('Kalibrasyonu atladım. Rıfkı hazır!');
+}
+
+/* VİDEO */
+
+$('f').onchange=function(e){
+var file=e.target.files[0];
+if(!file)return;
+
+v.src=URL.createObjectURL(file);
+v.style.display='block';
+v.play().catch(()=>{});
+};
+
+v.onended=function(){
+v.play().catch(()=>{});
+};
+
+/* BAŞLAT */
+
+bt.onclick=function(){
+$('i').style.display='none';
+
+started=true;
+
+try{
+document.documentElement.requestFullscreen();
+}catch(e){}
+
+try{
+screen.orientation.lock('landscape');
+}catch(e){}
+
+try{
+navigator.wakeLock.request('screen');
+}catch(e){}
+
+say(kisi?'Merhaba '+kisi+', ben Rıfkı!':'Merhaba! Ben Rıfkı. Artık seninle konuşabilirim.',function(){
+if(micOn)dinlemeBaslat();
+});
+};
+
+st.textContent='Rıfkı hazır! Başlat tuşuna basabilirsin.';
+bt.disabled=false;
+
+</script>
+</body>
+</html>
